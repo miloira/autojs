@@ -1,4 +1,4 @@
-`autojs`
+autojs
 ===============================================
 The RPC framework of autojs allows you to use Python to operate phone.
 
