@@ -73,7 +73,7 @@ class AutoJS:
     def handler(self, connection):
         self.connection = connection
         self.remote_host, self.remote_port = self.connection.remote_address
-        logger.info("Client(host=\"%s\", port=%s) connected." % (self.remote_host, self.remote_port))
+        self.logger.info("Client(host=\"%s\", port=%s) connected." % (self.remote_host, self.remote_port))
         self.event.set()
 
         while self.is_running:

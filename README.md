@@ -21,7 +21,7 @@ script mode
 from autojs import AutoJS
 
 with AutoJS() as auto_js:
-    auto_js.app.launchApp('微信')
+    auto_js.app.launchApp('微信').call()
     auto_js.eval('console.log("Hello AutoX.js")')
 ```
 
