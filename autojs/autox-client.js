@@ -100,7 +100,7 @@ function startWebSocketClient(url) {
                         });
                     }
                 } else {
-                    throw new Error("Not support argument type:" + packet.type)
+                    throw new Error("Not support argument type:" + packet.type);
                 }
             } catch (e) {
                 data = JSON.stringify({
@@ -127,7 +127,7 @@ function startWebSocketClient(url) {
 setInterval(() => {
     try {
         if (!isConnected) {
-            console.info("Waiting for the robot server " + host + ":" + port + " to issue command...")
+            console.info("Waiting for the Autojs server " + host + ":" + port + " to issue command...");
             ws = startWebSocketClient("ws://" + host + ":" + port + "/");
         }
     } catch (e) {
