@@ -139,4 +139,4 @@ events.on("exit", function () {
     ws.close(1001, "closed");
     console.log("autojs client exit.");
     console.hide();
-})
+});
