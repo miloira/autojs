@@ -1,31 +1,33 @@
-importPackage(Packages["okhttp3"]); //导入包
+importPackage(Packages["okhttp3"]);
 
-function getFunctionName(func) {
-    const funcStr = func.toString();
-    const matches = funcStr.match(/function\s+([^\s(]+)/);
-    return matches ? matches[1] : 'anonymous';
-  }
+console.show();
+
+const host = "192.168.0.100";
+const port = 8765;
+var isConnected = false;
+var reconnectInterval = 1000;
+var ws;
 
 function serializable(data) {
-    if(data === undefined) {
-        return null;
-    }
-    for(let key of Object.keys(data)) {
+    for (let key of Object.keys(data)) {
         if (typeof data[key] == "function") {
-            data[key] = getFunctionName(data[key]);
+            data[key] = data[key].toString();
+        } else if (typeof data[key] == "object") {
+            data[key] = serializable(data[key]);
         }
     }
     return data;
 }
 
 function startWebSocketClient(url) {
-    var client = new OkHttpClient();
-    var request = new Request.Builder().url(url).build();
+    const client = new OkHttpClient();
+    const request = new Request.Builder().url(url).build();
     client.dispatcher().cancelAll();
-    myListener = {
+    return client.newWebSocket(request, new WebSocketListener({
         onOpen: function (webSocket, response) {
+            console.log("onOpen", webSocket, response);
             ws = webSocket;
-            is_connected = true;
+            isConnected = true;
         },
         onMessage: function (webSocket, data) {
             console.log("receive data: " + data);
@@ -33,44 +35,64 @@ function startWebSocketClient(url) {
                 packet = JSON.parse(data);
                 if (packet.type === "cmd") {
                     try {
-
                         with (globalThis) {
                             if (packet.data === "") {
-                                value = "";
                                 data = "";
-                            }else {
-                                value = eval(packet.data)
+                            } else {
+                                value = eval(packet.data);
+                                console.log(value, typeof value);
+                                if (typeof value == "object") {
+                                    if (value == null) {
+                                        data = value;
+                                    } else {
+                                        try {
+                                            data = serializable(value);
+                                        } catch (e) {
+                                            errorMessage = e.toString();
+                                            if (errorMessage.indexOf('InternalError: Java method "getClass" cannot be assigned to.') !== -1) {
+                                                data = value.toString();
+                                            } else {
+                                                data = value;
+                                            }
+                                        }
+                                    }
+                                } else if (typeof value == "string") {
+                                    data = value;
+                                } else if (typeof value == "number") {
+                                    if (isNaN(value)) {
+                                        data = "NaN";
+                                    } else if (value === Infinity) {
+                                        data = "Infinity";
+                                    } else if (value === -Infinity) {
+                                        data = "-Infinity";
+                                    } else {
+                                        data = value;
+                                    }
+                                } else if (typeof value == "boolean") {
+                                    data = value;
+                                } else if (typeof value == "function") {
+                                    try {
+                                        data = value.toString().trim();
+                                    } catch (e) {
+                                        data = value;
+                                    }
+                                } else if (typeof value == "undefined") {
+                                    data = "undefined";
+                                } else if (typeof value == "bigint") {
+                                    data = value;
+                                } else if (typeof value == "symbol") {
+                                    data = value.toString();
+                                } else {
+                                    data = value;
+                                }
                             }
-                        }
-
-                        if (value && typeof value == "object") {
-                            //对象
-                            data = serializable(value);
-                        } else if (value && typeof value == "function") {
-                            //函数
-                            data = value.toString();
-                        } else if(typeof value == "string") {
-                            //字符串
-                            data = value;
-                        } else if(typeof value == "boolean"){
-                            //布尔
-                            data = value;
-                        } else if (value == null) {
-                            //null
-                            data = value;
-                        } else if (value === undefined) {
-                            //undefined
-                            data = "undefined";
-                        } else {
-                            //未知类型
-                            data = value;
                         }
                         data = JSON.stringify({
                             "id": packet.id,
                             "type": "result",
                             "data": data
                         });
-                    } catch(e) {
+                    } catch (e) {
                         data = JSON.stringify({
                             "id": packet.id,
                             "type": "error",
@@ -78,9 +100,9 @@ function startWebSocketClient(url) {
                         });
                     }
                 } else {
-                    throw Error("Not support argument type:" + packet.type)
+                    throw new Error("Not support argument type:" + packet.type)
                 }
-            } catch(e) {
+            } catch (e) {
                 data = JSON.stringify({
                     "id": packet.id,
                     "type": "error",
@@ -92,39 +114,29 @@ function startWebSocketClient(url) {
             }
         },
         onClosed: function (webSocket, code, reason) {
-            console.log(webSocket, code, reason)
-           is_connected = false;
+            console.log("onClosed", webSocket, code, reason);
+            isConnected = false;
         },
         onFailure: function (webSocket, throwable, response) {
-            console.log(webSocket, throwable, response)
-            is_connected = false;
+            console.log("onFailure", webSocket, throwable, response);
+            isConnected = false;
         },
-    };
-
-    return client.newWebSocket(request, new WebSocketListener(myListener));
+    }));
 }
 
-console.show();
-
-//服务器配置
-const host = "101.37.172.239";
-const port = 8765;
-var ws;
-var is_connected = false;
-
 setInterval(() => {
-    try{
-        if(!is_connected) {
+    try {
+        if (!isConnected) {
             console.info("Waiting for the robot server " + host + ":" + port + " to issue command...")
             ws = startWebSocketClient("ws://" + host + ":" + port + "/");
         }
-    } catch(e) {
-        console.log(e)
+    } catch (e) {
+        console.log(e);
     }
-}, 1000); //防止主线程退出
+}, reconnectInterval);
 
-
-events.on("exit", function (){
+events.on("exit", function () {
     ws.close(1001, "closed");
-    console.log("客户端已退出！")
+    console.log("autojs client exit.");
+    console.hide();
 })
